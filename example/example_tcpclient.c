@@ -112,7 +112,7 @@ static u8 m_RxBuf_Uart[SERIAL_RX_BUFFER_LEN];
 #define TCP_TIMER_PERIOD      1000
 
 #define READ_TIMER_ID           TIMER_ID_USER_START+1
-#define READ_TIMER_PERIOD      1000
+#define READ_TIMER_PERIOD      10000
 
 #define NTP_TIMER_ID           TIMER_ID_USER_START+2
 #define NTP_TIMER_PERIOD      10000
@@ -175,7 +175,7 @@ static void CallBack_UART_Hdlr(Enum_SerialPort port, Enum_UARTEventType msg, boo
 * timer callback function
 ******************************************************************/
 //static void Callback_Timer(u32 timerId, void* param);
-static void Callback_Read_Timer(u32 timerId, void* param);
+//static void Callback_Read_Timer(u32 timerId, void* param);
 static void Callback_Ntp_Timer(u32 timerId, void* param);
 u8 tcp_network_enable=0;
 /*****************************************************************
@@ -295,8 +295,8 @@ Setup modbus address use:Set_Para=<Modbus_address>\r\n",command_read[0]);
 
     //register & start timer 
   //  Ql_Timer_Register(TCP_TIMER_ID, Callback_Timer, NULL);
-    Ql_Timer_Register(READ_TIMER_ID, Callback_Read_Timer, NULL);
-    Ql_Timer_Start(READ_TIMER_ID, READ_TIMER_PERIOD, TRUE);
+  //  Ql_Timer_Register(READ_TIMER_ID, Callback_Read_Timer, NULL);
+  //  Ql_Timer_Start(READ_TIMER_ID, READ_TIMER_PERIOD, TRUE);
 
      Ql_Timer_Register(NTP_TIMER_ID, Callback_Ntp_Timer, NULL);
     Ql_Timer_Start(NTP_TIMER_ID, NTP_TIMER_PERIOD, TRUE);
@@ -589,7 +589,7 @@ void proc_send2srv(s32 taskId)
 
                             
                     data_buf2hex(data_mult_fram,send_buffer_hex,temp_u16+8);
-                    APP_DEBUG("\r\nsend string fram:%s\r\n",send_buffer_hex);
+                    //APP_DEBUG("\r\nsend string fram:%s\r\n",send_buffer_hex);
 
                     string_len=0;
                 }
@@ -657,7 +657,7 @@ void proc_send2srv(s32 taskId)
         Ql_GPIO_SetLevel(sending,PINLEVEL_HIGH);
         ret = RIL_SOC_QISENDEX(m_socketid,Ql_strlen(send_buffer_hex)/2,send_buffer_hex);
         
-        APP_DEBUG("\r\nsend:%s,ack_len=%d ",send_buffer_hex,ack_len);
+        //APP_DEBUG("\r\nsend:%s,ack_len=%d ",send_buffer_hex,ack_len);
         if(ack_len&&f_ack_cmd)
             {flag_resp=1;ack_len=0;f_ack_cmd=0;}
         else flag_resp=0;  
@@ -967,7 +967,7 @@ static void proc_handle(u8 *pData,s32 len)
 
     
 }
-
+/*
 static void Callback_Read_Timer(u32 timerId, void* param)
 {
     s32 ret;
@@ -977,11 +977,11 @@ static void Callback_Read_Timer(u32 timerId, void* param)
       //  APP_DEBUG("o->");
      //   Ql_GPIO_SetLevel(send485,PINLEVEL_HIGH);
 
-        if(command_len)
+        //if(command_len)
         {
             Ql_UART_Write(m_myUartPort, command_data, command_len);
-            command_len=0;
-            APP_DEBUG("cmd send to device");
+           // command_len=0;
+           // APP_DEBUG("cmd send to device");
         }
     //    else 
           
@@ -995,7 +995,7 @@ static void Callback_Read_Timer(u32 timerId, void* param)
         
     }
 
-}
+}*/
 static void Callback_Ntp_Timer(u32 timerId, void* param)
 {
     s32 ret;
@@ -1003,8 +1003,9 @@ static void Callback_Ntp_Timer(u32 timerId, void* param)
    
     if(timerId==NTP_TIMER_ID)
     {
-        command_len=8;
-
+        //command_len=8;
+        Ql_UART_Write(m_myUartPort, command_data, 8);
+        APP_DEBUG("Au10\r\n");
         if(++count_1000s>100)
         {   
             count_1000s=0;
@@ -1388,7 +1389,7 @@ u8 proc_cmd(u8 len,u8 * inbuf,u8 * outbuf)
             continue;
         }
         if(current_len==0) break;
-        APP_DEBUG("pakg_len:%02x,pakg_type:%02x\r\n",current_len,pakg_type);
+        //APP_DEBUG("pakg_len:%02x,pakg_type:%02x\r\n",current_len,pakg_type);
         switch(pakg_type)
         {
             case 0x81://time
@@ -1542,7 +1543,7 @@ unsigned char  insert_list(unsigned char *list,unsigned char *ip_new)
     exchange(list+a*6,list+b*6);
     Ql_memcpy(list+a*6,ip_new,6);
     
-    if(++count_save_ip>2) {  
+    if(++count_save_ip>=2) {  
         Ql_SecureData_Store(1, list,25);count_save_ip=0;
         APP_DEBUG("ip_saved!\r\n")
     }
