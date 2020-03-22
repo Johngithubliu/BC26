@@ -301,7 +301,7 @@ Setup modbus address use:Set_Para=<Modbus_address>\r\n",command_read[0]);
   //  Ql_Timer_Start(READ_TIMER_ID, READ_TIMER_PERIOD, TRUE);
 
      Ql_Timer_Register(NTP_TIMER_ID, Callback_Ntp_Timer, NULL);
-    Ql_Timer_Start(NTP_TIMER_ID, NTP_TIMER_PERIOD, TRUE);
+   // Ql_Timer_Start(NTP_TIMER_ID, NTP_TIMER_PERIOD, TRUE);
 
     while(TRUE)
     {
@@ -325,6 +325,7 @@ Setup modbus address use:Set_Para=<Modbus_address>\r\n",command_read[0]);
 				if(SIM_STAT_READY == msg.param2)
 				{
                   // Ql_Timer_Start(TCP_TIMER_ID, TCP_TIMER_PERIOD, TRUE);
+                    Ql_Timer_Start(NTP_TIMER_ID, NTP_TIMER_PERIOD, TRUE);
                     tcp_network_enable=1;
    
 				}
