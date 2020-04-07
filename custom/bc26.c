@@ -58,11 +58,16 @@
 #include "ql_time.h"
 #include "ql_system.h"
 #include "ql_gpio.h"
+#include "oled.h"
 
 
 #include "fifo.h"
 
+#define TEST_SEND   
+#define OLED   
 
+#define TEST_INTERLEAV  1
+//6->60s
 
 #define TIME_OUT_CON 15
 #define MAX_FRAM 16
@@ -242,6 +247,7 @@ u8 iccid[32];
 u8 iccid_bcd[8];
 u8 rssi;
 u8 timestr[64];
+u8 qeng[128];
 u8 first=1;
 
 unsigned char insert_list(unsigned char *,unsigned char *);
@@ -257,9 +263,7 @@ void proc_main_task(s32 taskId)
     u16 modbus_read_crc;
 	s32 ret;
     time_out_con=TIME_OUT_CON;
-     
-    
-  
+
     // Initialize the GPIO pin (output high level, pull up)
     Ql_GPIO_Init(sending, PINDIRECTION_OUT, gpioLvl, PINPULLSEL_PULLUP);
     
@@ -302,6 +306,11 @@ Setup modbus address use:Set_Para=<Modbus_address>\r\n",command_read[0]);
 
      Ql_Timer_Register(NTP_TIMER_ID, Callback_Ntp_Timer, NULL);
    // Ql_Timer_Start(NTP_TIMER_ID, NTP_TIMER_PERIOD, TRUE);
+#ifdef OLED
+    APP_DEBUG("test oled ...");
+    test_oled();
+
+#endif
 
     while(TRUE)
     {
@@ -401,6 +410,9 @@ Setup modbus address use:Set_Para=<Modbus_address>\r\n",command_read[0]);
 					ret = RIL_SOC_QICLOSE(msg.param2);
 					if (ret == 0)
                     {
+#ifdef OLED
+                        OLED_ShowString(48,6,"DISCONNECT");
+#endif
                         APP_DEBUG("<-- closed socket successfully\r\n");
                         m_tcp_state = STATE_TOTAL_NUM;
                         Ql_GPIO_SetLevel(net_ok, PINLEVEL_LOW);
@@ -573,6 +585,7 @@ void proc_send2srv(s32 taskId)
                 }
                 else if(string_len)
                 {
+                    //APP_DEBUG("string_buffer=%s\r\n",string_buffer+6);
                     temp_u16=string_len+8;
                     Ql_memcpy(data_mult_fram+16,string_buffer,string_len);
                     data_mult_fram[temp_u16+8+0]=0x01;
@@ -647,12 +660,11 @@ void proc_send2srv(s32 taskId)
         
         while(m_tcp_state!=STATE_SOC_CONNECTED)
         {  
-
-            if(m_tcp_state==STATE_TOTAL_NUM)
+            //APP_DEBUG("m_tcp_state=%d",m_tcp_state);
+            //if(m_tcp_state==STATE_TOTAL_NUM)  
+            if(m_tcp_state!=STATE_SOC_OPEN) 
             {
                 m_tcp_state=STATE_NW_QUERY_STATE;
-               
-               
             }
              APP_DEBUG(".");
              Ql_Sleep(2000);
@@ -683,6 +695,7 @@ void proc_send2srv(s32 taskId)
                 if(m_tcp_state==STATE_TOTAL_NUM)
                 {
                     m_tcp_state=STATE_NW_QUERY_STATE;
+                    APP_DEBUG("no connection,change to STATE_SOC_OPEN.");
                    
                    
                 }
@@ -970,45 +983,86 @@ static void proc_handle(u8 *pData,s32 len)
 
     
 }
-/*
-static void Callback_Read_Timer(u32 timerId, void* param)
-{
-    s32 ret;
-   
-    if(timerId==READ_TIMER_ID)
-    {
-      //  APP_DEBUG("o->");
-     //   Ql_GPIO_SetLevel(send485,PINLEVEL_HIGH);
 
-        //if(command_len)
-        {
-            Ql_UART_Write(m_myUartPort, command_data, command_len);
-           // command_len=0;
-           // APP_DEBUG("cmd send to device");
-        }
-    //    else 
-          
-    //    Ql_UART_Write(m_myUartPort, command_read, 8);
-      
-      
-    //    Ql_Sleep(20);
-     //   Ql_GPIO_SetLevel(send485,PINLEVEL_LOW);
-        
- 
-        
-    }
-
-}*/
 static void Callback_Ntp_Timer(u32 timerId, void* param)
 {
     s32 ret;
     static u8 count_1000s=0;
+    u8 totalBytes;
+    u8 csq_fifo[10];
+    static u16 count_test=0;
    
     if(timerId==NTP_TIMER_ID)
     {
         //command_len=8;
         Ql_UART_Write(m_myUartPort, command_data, 8);
-        APP_DEBUG("Au10\r\n");
+        APP_DEBUG("Au10.");
+#ifdef OLED
+       
+        OLED_ShowNum(48,2,rssi,2,16);
+#endif
+        //for test 
+#ifdef      TEST_SEND
+        APP_DEBUG("TEST_SEND...");
+        if(++count_test>=TEST_INTERLEAV)
+        {
+            count_test=0;
+
+            RIL_GetCSQ(&rssi);
+            ret=RIL_GetQENG(qeng);
+
+            if(ret==RIL_AT_SUCCESS)
+            {
+                APP_DEBUG("GetQeng OK! %s\r\n",qeng);
+    //------------------------------insert qeng to data-----------
+                if((Ql_GetLocalTime(&time)))
+                {
+                
+                    totalSeconds= Ql_Mktime(&time);
+                    //totalSeconds-=8*3600;
+                    //if(totalSeconds==pr_totalSeconds)
+                    //    totalSeconds++;
+                    //pr_totalSeconds=totalSeconds;
+                                       
+                }
+                else
+                {
+                    APP_DEBUG("\r\n<--failed !! Local time not determined -->\r\n");
+                }
+                totalBytes=Ql_strlen(qeng);
+                string_buffer[0]=totalBytes+4;//length
+                string_buffer[1]=0x0ff;//data_type=0xff,is string.
+                string_buffer[2]=(totalSeconds>>24)&0x0ff;
+                string_buffer[3]=(totalSeconds>>16)&0x0ff;
+                string_buffer[4]=(totalSeconds>>8)&0x0ff;
+                string_buffer[5]=(totalSeconds)&0x0ff;//time ,4bytes.
+           
+                Ql_memcpy(string_buffer+6,qeng,totalBytes);
+                string_len=string_buffer[0]+2;
+               //APP_DEBUG("Ur:%s",m_RxBuf_Uart+8);
+    //---------------------end insert qeng to data ----------------
+      //insert csq to data-------------------------
+                csq_fifo[0]=8;//length
+                csq_fifo[1]=0x01;//data_type=1,is time+weight.
+                csq_fifo[2]=(totalSeconds>>24)&0x0ff;
+                csq_fifo[3]=(totalSeconds>>16)&0x0ff;
+                csq_fifo[4]=(totalSeconds>>8)&0x0ff;
+                csq_fifo[5]=(totalSeconds)&0x0ff;//time ,4bytes.
+           
+                csq_fifo[6]=0;
+                csq_fifo[7]=0;
+                csq_fifo[8]=0;
+                csq_fifo[9]=rssi;//use weight,4bytes.
+                                 
+                fifo_push(data_fifo,csq_fifo);
+     //end inser csq to data--------------------------
+            }
+            else APP_DEBUG("get qeng fail");
+          
+            //end for test
+        }
+#endif
+        
         if(++count_1000s>100)
         {   
             count_1000s=0;
@@ -1057,7 +1111,13 @@ void proc_tcp_network(s32 taskId)
                 ret=RIL_GetCSQ(&rssi);
                 APP_DEBUG("CSQ=%d\r\n",rssi);
                 ret = RIL_NW_GetEGPRSState(&cgreg);
-                APP_DEBUG("<--Network State:cgreg=%d-->\r\n",cgreg);
+                APP_DEBUG("<Network State:cgreg=%d>\r\n",cgreg);
+#ifdef OLED
+                if(cgreg==NW_STAT_REGISTERED) OLED_ShowString(48,0,"REGISTERED");
+                else if(cgreg==NW_STAT_REGISTERED_ROAMING) OLED_ShowString(48,0,"ROAMING   ");
+                else if(cgreg==NW_STAT_SEARCHING) OLED_ShowString(48,0,"SEARCHING ");
+
+#endif
                 if((cgreg == NW_STAT_REGISTERED)||(cgreg == NW_STAT_REGISTERED_ROAMING))
                 {
                     if(first==0)
@@ -1065,7 +1125,9 @@ void proc_tcp_network(s32 taskId)
                         m_tcp_state = STATE_SOC_OPEN;
                         cereg_count=0;
                        // Ql_GPIO_SetLevel(contron,PINLEVEL_LOW);
+                        APP_DEBUG("m_tcp_state change to STATE_SOC_OPEN.");
                     }
+                    else APP_DEBUG("cereg=1 but no need open.");
                 }
 
                 else
@@ -1073,7 +1135,8 @@ void proc_tcp_network(s32 taskId)
                     if(++cereg_count>50)
                     {
                         cereg_count=0;
-                        reboot_rf();
+                        //reboot_rf();
+                        Ql_RIL_SendATCmd("AT+QRST=1\r\n",Ql_strlen("AT+QRST=1\r\n"),NULL,NULL,0);
 
                     }
 
@@ -1105,8 +1168,11 @@ void proc_tcp_network(s32 taskId)
 				}
                 else APP_DEBUG("socket_recv_param_ptr.address get memmory failure\r\n");
 				              
-                APP_DEBUG("open %s:%d \r\n",socket_param_t.address,socket_param_t.remote_port);
-                
+                APP_DEBUG("open %s:%d,%d times \r\n",socket_param_t.address,socket_param_t.remote_port,ip_err_count);
+#ifdef OLED
+                OLED_ShowString(22,4,m_SrvADDR);
+#endif
+            
                 ret = RIL_SOC_QIOPEN(&socket_param_t);
 				if(ret>=0 && ret<=4)
                 {
@@ -1117,20 +1183,30 @@ void proc_tcp_network(s32 taskId)
                     time_out_con=TIME_OUT_CON;
                     ip_err_count=0;
                     chang_ip_count=0;
+#ifdef OLED
+                    OLED_ShowString(48,6,"CONNECTED ");
+#endif
                                        
                 }
 				else
                 {
+                    Ql_GPIO_SetLevel(net_ok, PINLEVEL_HIGH);
+                    Ql_Sleep(1000);
+                    Ql_GPIO_SetLevel(net_ok, PINLEVEL_LOW);//
                     APP_DEBUG("<--Open server failure,error=%d,%d times>\r\n",ret,ip_err_count);
                     /*if(ret==-1)
                     {
                         reboot_rf();
                     
+
 					}*/
                     ret = RIL_SOC_QICLOSE(0);
                     APP_DEBUG("close socket ,ret=%d\r\n",ret);
                     //m_tcp_state = STATE_SOC_CLOSE;
                     Ql_GPIO_SetLevel(net_ok, PINLEVEL_LOW);
+#ifdef OLED
+                OLED_ShowString(48,6,"DISCONNECT");
+#endif
 
                     if((++ip_err_count%2)==0)
                     {
@@ -1140,11 +1216,15 @@ void proc_tcp_network(s32 taskId)
                         {
                             chang_ip_count++;
                             change_next_ip();
+                            m_tcp_state=STATE_NW_QUERY_STATE;
                         }
-                        if(ip_err_count>15)
+                        if(ip_err_count>12)
                         {
                             ip_err_count=0;
-                            reboot_rf();    
+                            chang_ip_count=0;
+                            get_ip();
+                            //reboot_rf();
+                            Ql_RIL_SendATCmd("AT+QRST=1\r\n",Ql_strlen("AT+QRST=1\r\n"),NULL,NULL,0);    
                         }
                         
                     }
@@ -1164,7 +1244,9 @@ void proc_tcp_network(s32 taskId)
                 if (ret == 0)
                 {
                     APP_DEBUG("<closed>\r\n");
-					
+#ifdef OLED
+                OLED_ShowString(48,6,"DISCONNECT");
+#endif					
 
                 }else
                 {
@@ -1172,6 +1254,7 @@ void proc_tcp_network(s32 taskId)
                 }
                 m_tcp_state = STATE_TOTAL_NUM;
                 Ql_GPIO_SetLevel(net_ok, PINLEVEL_LOW);
+
                // APP_DEBUG("<--Restart the TCP connection process.-->\r\n");
                
                 break;
@@ -1211,7 +1294,7 @@ void   reboot_rf()
     Ql_Sleep(1000);
     APP_DEBUG("cfun=1\r\n");
     m_tcp_state = STATE_NW_QUERY_STATE;
-    first=1;
+   // first=1;
    // Ql_Timer_Start(TCP_TIMER_ID, TCP_TIMER_PERIOD, TRUE);
 
 }
@@ -1250,7 +1333,7 @@ void get_ip()
         Ql_memcpy(m_SrvADDR,parament.mast_ip,Ql_strlen(parament.mast_ip));
     else {  
         Ql_sprintf(m_SrvADDR,"%d.%d.%d.%d",ip_saved[ip_saved[24]*6],ip_saved[ip_saved[24]*6+1],ip_saved[ip_saved[24]*6+2],ip_saved[ip_saved[24]*6+3]);
-        Ql_sprintf(m_SrvADDR,"%d.%d.%d.%d",ip_saved[ip_saved[24]*6],ip_saved[ip_saved[24]*6+1],ip_saved[ip_saved[24]*6+2],ip_saved[ip_saved[24]*6+3]);
+       // Ql_sprintf(m_SrvADDR,"%d.%d.%d.%d",ip_saved[ip_saved[24]*6],ip_saved[ip_saved[24]*6+1],ip_saved[ip_saved[24]*6+2],ip_saved[ip_saved[24]*6+3]);
 
 }
     m_SrvPort=(ip_saved[ip_saved[24]*6+4]<<8)+ip_saved[ip_saved[24]*6+5];

@@ -66,6 +66,7 @@ s32 RIL_GetIMSI(char* imsi);
 s32 RIL_GetCSQ(char* csq);
 s32 RIL_GetICCID(char *iccid);
 s32 RIL_GetNtpTime(char *time);
+s32 RIL_GetQENG(char* qeng);
 
 
 /*****************************************************************

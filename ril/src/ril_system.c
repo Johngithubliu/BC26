@@ -187,6 +187,54 @@ s32 RIL_GetICCID(char* iccid)
     return Ql_RIL_SendATCmd(strAT, Ql_strlen(strAT), ATRsp_ICCID_Handler,(void*)iccid, 300);
 }
 //iccid end
+//qend
+static s32 ATRsp_QENG_Handler(char* line, u32 len, void* param)
+{
+    char* pHead = NULL;
+    pHead = Ql_RIL_FindLine(line, len, "OK"); // find <CR><LF>OK<CR><LF>, <CR>OK<CR>£¬<LF>OK<LF>
+    if (pHead)
+    {  
+        return RIL_ATRSP_SUCCESS;
+    }
+
+    pHead = Ql_RIL_FindLine(line, len, "ERROR");// find <CR><LF>ERROR<CR><LF>, <CR>ERROR<CR>£¬<LF>ERROR<LF>
+    if (pHead)
+    {  
+        return RIL_ATRSP_FAILED;
+    } 
+
+    pHead = Ql_RIL_FindString(line, len, "+CME ERROR:");//fail
+    if (pHead)
+    {
+        return RIL_ATRSP_FAILED;
+    }
+    pHead = Ql_RIL_FindString(line, len, "+QENG:");//fail
+    if (pHead)
+    {
+        char* p1 = NULL;
+        char* p2 = NULL;
+        
+        p1 = pHead;
+       
+        p2 = Ql_strstr(p1 + 1, "\r\n");
+        if (p1 && p2)
+        {
+            Ql_memcpy((char*)param, p1, p2-p1);
+        }
+    }
+    return RIL_ATRSP_CONTINUE; //continue wait
+}
+
+s32 RIL_GetQENG(char* qeng)
+{
+    char strAT[] = "AT+QENG=0\n";
+    if (NULL == qeng)
+    {
+        return RIL_AT_INVALID_PARAM;
+    }
+    return Ql_RIL_SendATCmd(strAT, Ql_strlen(strAT), ATRsp_QENG_Handler,(void*)qeng, 300);
+}
+//qend end
 static s32 ATRsp_CSQ_Handler(char* line, u32 len, void* param)
 {
     char* pHead = NULL;
