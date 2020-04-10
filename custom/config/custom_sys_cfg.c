@@ -32,6 +32,7 @@
  ****************************************************************************/
 #include "ril.h"
 #include "ql_common.h"
+#include "ql_uart.h"
 
 /*========================================================================
 | 
@@ -96,8 +97,10 @@ static const ST_DebugPortCfg debugPortCfg = {
      //ADVANCE_MODE   // Set the serial  port to a special debug port
 };
 static const ST_DebugPortSet debugPortSet = {
+   //UART_PORT2,
     PORTNAME_UART2,      // Set the serial debug port (UART2) to GKI log .Can choose UART0/UART1/UART2/
-    PORTNAME_UART1      // Set the serial debug port (UART1) to HSL log .Can choose UART0/UART1/UART2/
+   UART_PORT1
+   //PORTNAME_UART1      // Set the serial debug port (UART1) to HSL log .Can choose UART0/UART1/UART2/
 };
 
 const ST_SystemConfig SystemCfg[] = {

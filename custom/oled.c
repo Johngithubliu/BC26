@@ -325,11 +325,14 @@ void test_oled()
 
 		OLED_ShowString(0,0,"CEREG:");
 		//OLED_ShowString(1,1,"CESQ:");
-		OLED_ShowString(0,2,"RSSI:");
+		
 		//OLED_ShowString(3,3,"TCP STATUS:");
-		OLED_ShowString(0,4,"IP:");
+		OLED_ShowString(0,2,"IP:");
 		//OLED_ShowChar(5,5,'5');
-		OLED_ShowString(0,6,"TCP:");
+		OLED_ShowString(0,4,"TCP:");
+
+		OLED_ShowString(0,6,"RSSI:");
+
 
 	//	OLED_ShowCHinese(90,0,4);
 

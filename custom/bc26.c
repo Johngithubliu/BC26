@@ -63,8 +63,8 @@
 
 #include "fifo.h"
 
-#define TEST_SEND   
-#define OLED   
+//#define TEST_SEND   
+//#define OLED   
 
 #define TEST_INTERLEAV  1
 //6->60s
@@ -271,12 +271,13 @@ void proc_main_task(s32 taskId)
     Ql_GPIO_Init(send485, PINDIRECTION_OUT, gpioLvl, PINPULLSEL_PULLUP);
     Ql_GPIO_Init(contron, PINDIRECTION_OUT, PINLEVEL_HIGH, PINPULLSEL_PULLUP);
 
-
+     // for get Log----------
     // Register & open UART port
     ret = Ql_UART_Register(m_myUartPort, CallBack_UART_Hdlr, NULL);
     ret = Ql_UART_Open(m_myUartPort, 1200, FC_NONE);
 	ret = Ql_UART_Register(UART_PORT0, CallBack_UART_Hdlr, NULL);
     ret = Ql_UART_Open(UART_PORT0, 115200, FC_NONE);
+
     APP_DEBUG("\r\nOpenCPU for BC26,SDK version 1.3 ,Builde at %s %s by John\r\n",__DATE__,__TIME__);
     data_fifo=Ql_MEM_Alloc(sizeof(struct FIFO));
     pbuf=Ql_MEM_Alloc(MAX_BUF*DATA_LEN);
@@ -309,6 +310,7 @@ Setup modbus address use:Set_Para=<Modbus_address>\r\n",command_read[0]);
 #ifdef OLED
     APP_DEBUG("test oled ...");
     test_oled();
+    OLED_ShowNum(48,6,rssi,2,16);
 
 #endif
 
@@ -411,7 +413,7 @@ Setup modbus address use:Set_Para=<Modbus_address>\r\n",command_read[0]);
 					if (ret == 0)
                     {
 #ifdef OLED
-                        OLED_ShowString(48,6,"DISCONNECT");
+                        OLED_ShowString(48,4,"DISCONNECT");
 #endif
                         APP_DEBUG("<-- closed socket successfully\r\n");
                         m_tcp_state = STATE_TOTAL_NUM;
@@ -605,7 +607,7 @@ void proc_send2srv(s32 taskId)
 
                             
                     data_buf2hex(data_mult_fram,send_buffer_hex,temp_u16+8);
-                    //APP_DEBUG("\r\nsend string fram:%s\r\n",send_buffer_hex);
+                    APP_DEBUG("\r\nsend string fram:%s\r\n",send_buffer_hex);
 
                     string_len=0;
                 }
@@ -677,6 +679,10 @@ void proc_send2srv(s32 taskId)
             {flag_resp=1;ack_len=0;f_ack_cmd=0;}
         else flag_resp=0;  
 
+#ifdef OLED
+        OLED_ShowString(72,6,"Send..");
+#endif
+
         if(ret==0)
         {
             Ql_GPIO_SetLevel(sending,PINLEVEL_LOW);
@@ -692,12 +698,9 @@ void proc_send2srv(s32 taskId)
             while(m_tcp_state!=STATE_SOC_CONNECTED)
             {  
 
-                if(m_tcp_state==STATE_TOTAL_NUM)
+                if(m_tcp_state!=STATE_SOC_OPEN) 
                 {
                     m_tcp_state=STATE_NW_QUERY_STATE;
-                    APP_DEBUG("no connection,change to STATE_SOC_OPEN.");
-                   
-                   
                 }
                  APP_DEBUG("*");
                  Ql_Sleep(2000);
@@ -716,7 +719,14 @@ void proc_send2srv(s32 taskId)
 
             Ql_Sleep(200);
             //APP_DEBUG("*");
-            if(flag_resp) break;
+            if(flag_resp) 
+                {
+#ifdef OLED
+        OLED_ShowString(72,6,"      ");
+#endif
+                    break;
+
+                }
         }
        
         Ql_Sleep(200);
@@ -999,15 +1009,15 @@ static void Callback_Ntp_Timer(u32 timerId, void* param)
         APP_DEBUG("Au10.");
 #ifdef OLED
        
-        OLED_ShowNum(48,2,rssi,2,16);
+        OLED_ShowNum(48,6,rssi,2,16);
 #endif
         //for test 
 #ifdef      TEST_SEND
-        APP_DEBUG("TEST_SEND...");
+        
         if(++count_test>=TEST_INTERLEAV)
         {
             count_test=0;
-
+            APP_DEBUG("TEST_SEND...");
             RIL_GetCSQ(&rssi);
             ret=RIL_GetQENG(qeng);
 
@@ -1135,8 +1145,10 @@ void proc_tcp_network(s32 taskId)
                     if(++cereg_count>50)
                     {
                         cereg_count=0;
-                        //reboot_rf();
-                        Ql_RIL_SendATCmd("AT+QRST=1\r\n",Ql_strlen("AT+QRST=1\r\n"),NULL,NULL,0);
+                        reboot_rf();
+                        //Ql_RIL_SendATCmd("AT+QCSEARFCN\r\n",Ql_strlen("AT+QCSEARFCN\r\n"),NULL,NULL,0);
+                        //Ql_Sleep(300);
+                        //Ql_RIL_SendATCmd("AT+QRST=1\r\n",Ql_strlen("AT+QRST=1\r\n"),NULL,NULL,0);
 
                     }
 
@@ -1170,7 +1182,7 @@ void proc_tcp_network(s32 taskId)
 				              
                 APP_DEBUG("open %s:%d,%d times \r\n",socket_param_t.address,socket_param_t.remote_port,ip_err_count);
 #ifdef OLED
-                OLED_ShowString(22,4,m_SrvADDR);
+                OLED_ShowString(24,2,m_SrvADDR);
 #endif
             
                 ret = RIL_SOC_QIOPEN(&socket_param_t);
@@ -1184,7 +1196,7 @@ void proc_tcp_network(s32 taskId)
                     ip_err_count=0;
                     chang_ip_count=0;
 #ifdef OLED
-                    OLED_ShowString(48,6,"CONNECTED ");
+                    OLED_ShowString(48,4,"CONNECTED ");
 #endif
                                        
                 }
@@ -1205,7 +1217,7 @@ void proc_tcp_network(s32 taskId)
                     //m_tcp_state = STATE_SOC_CLOSE;
                     Ql_GPIO_SetLevel(net_ok, PINLEVEL_LOW);
 #ifdef OLED
-                OLED_ShowString(48,6,"DISCONNECT");
+                OLED_ShowString(48,4,"DISCONNECT");
 #endif
 
                     if((++ip_err_count%2)==0)
@@ -1223,8 +1235,10 @@ void proc_tcp_network(s32 taskId)
                             ip_err_count=0;
                             chang_ip_count=0;
                             get_ip();
-                            //reboot_rf();
-                            Ql_RIL_SendATCmd("AT+QRST=1\r\n",Ql_strlen("AT+QRST=1\r\n"),NULL,NULL,0);    
+                            reboot_rf();
+                            //Ql_RIL_SendATCmd("AT+QCSEARFCN\r\n",Ql_strlen("AT+QCSEARFCN\r\n"),NULL,NULL,0);
+                            //Ql_Sleep(300);
+                            //Ql_RIL_SendATCmd("AT+QRST=1\r\n",Ql_strlen("AT+QRST=1\r\n"),NULL,NULL,0);    
                         }
                         
                     }
@@ -1245,7 +1259,7 @@ void proc_tcp_network(s32 taskId)
                 {
                     APP_DEBUG("<closed>\r\n");
 #ifdef OLED
-                OLED_ShowString(48,6,"DISCONNECT");
+                OLED_ShowString(48,4,"DISCONNECT");
 #endif					
 
                 }else
@@ -1286,7 +1300,10 @@ void   reboot_rf()
 {
     u32 ret; 
    // Ql_Timer_Stop(TCP_TIMER_ID);
+
+    Ql_RIL_SendATCmd("AT+QCSEARFCN\r\n",Ql_strlen("AT+QCSEARFCN\r\n"),NULL,NULL,0);
     APP_DEBUG("reboot rf,cfun=0\r\n");
+    Ql_Sleep(1000);
     ret = Ql_RIL_SendATCmd("AT+CFUN=0\r\n",Ql_strlen("AT+CFUN=0\r\n"),NULL,NULL,0);
 
     Ql_Sleep(5000);

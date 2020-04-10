@@ -80,6 +80,7 @@ static s32 ATRsp_IMEI_Handler(char* line, u32 len, void* param)
         {
             Ql_memcpy((char*)param, p1 + 2, p2 - p1 - 2);
         }
+
     }
     return RIL_ATRSP_CONTINUE; //continue wait
 }
@@ -291,7 +292,8 @@ static s32 ATRsp_NTP_Handler(char* line, u32 len, void* param)
     pHead = Ql_RIL_FindLine(line, len, "OK"); // find <CR><LF>OK<CR><LF>, <CR>OK<CR>£¬<LF>OK<LF>
     if (pHead)
     {  
-        return RIL_ATRSP_SUCCESS;
+        //return RIL_ATRSP_SUCCESS;
+        return RIL_ATRSP_CONTINUE; //continue wait
     }
 
     pHead = Ql_RIL_FindLine(line, len, "ERROR");// find <CR><LF>ERROR<CR><LF>, <CR>ERROR<CR>£¬<LF>ERROR<LF>
@@ -313,12 +315,16 @@ static s32 ATRsp_NTP_Handler(char* line, u32 len, void* param)
         
         p1 = pHead;
        
-        p2 = Ql_strstr(p1 + 1, ",");
+        p2 = Ql_strstr(p1 + 1, "\r\n");
         if (p1 && p2)
         {
-            Ql_memcpy((char*)param, line, len);
+            Ql_memcpy((char*)param, p1, p2-p1);
             //*(char *)param=Ql_atoi(p1+5);
         }
+        if(Ql_strstr(param,"550")) return RIL_ATRSP_FAILED;
+        else        return RIL_ATRSP_SUCCESS;
+
+
     }
     return RIL_ATRSP_CONTINUE; //continue wait
 }
